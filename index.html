@@ -1,0 +1,290 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <title>Final Project Crime Incidents 2023</title>
+
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"
+          integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY="
+          crossorigin=""/>
+
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"
+            integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo="
+            crossorigin=""></script>
+
+    <!-- Load c3.css -->
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/c3/0.7.20/c3.css" rel="stylesheet">
+
+    <!-- Load d3.js and c3.js -->
+    <script src="https://d3js.org/d3.v5.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/c3/0.7.20/c3.min.js"></script>
+
+    <!-- Load Leaflet Heatmap -->
+    <script src="https://leaflet.github.io/Leaflet.heat/dist/leaflet-heat.js"></script>
+
+    <script type="text/javascript" src="data.js"></script>
+    <script type="text/javascript" src="data2.js"></script>
+
+    <style type="text/css">
+        /* Style of the Legend: adjust the values below to change the appearance of the legend pane*/
+        .legend {
+            padding: 6px 8px;
+            line-height: 18px;
+            background: rgba(255,255,255,0.9);
+            box-shadow: 0 0 15px rgba(0,0,0,0.2);
+            border-radius: 5px;
+        }
+
+        /* Adjust the values below to change the appearance of the legend color boxes */
+        .legend i {
+            width: 18px;
+            height: 18px;
+            float: left;
+            margin-right: 8px;
+            opacity: 0.7;
+        }
+
+        /* Additional styles for the map container */
+        #map {
+            height: 700px; /* Adjust the height as needed */
+            border-radius: 15px;
+            box-shadow: 0 0 20px rgba(0, 0, 0, 0.7);
+            overflow: hidden;
+            margin-bottom: 20px;
+        }
+
+        /* Style for the title */
+        .map-title {
+            text-align: center;
+            font-size: 24px;
+            font-weight: bold;
+            margin-top: 30px;
+            margin-bottom: 30px;
+        }
+/* Additional styles for heatmap gradient labels */
+.heatmap-gradient-label {
+    display: block;
+    font-size: 10px;
+    line-height: 10px;
+    color: black; /* Change color to white */
+    position: absolute;
+    font-weight: bold; /* Make the text bold */
+}
+
+.heatmap-gradient-high {
+    bottom: 0;
+    left: 0; /* Change right to left */
+    text-align: left; /* Change text-align to left */
+    padding-left: 50px; /* Add some padding for better spacing */
+}
+
+.heatmap-gradient-low {
+    top: 0;
+    left: 0; /* Change right to left */
+    text-align: left; /* Change text-align to left */
+    padding-left: 50px; /* Add some padding for better spacing */
+}
+
+.heatmap-gradient-bar {
+    height: 100px; /* Adjust the height as needed */
+    width: 20px;
+    position: relative;
+}
+    </style>
+</head>
+<body>
+<div class="map-title">CitySafe 2023: Mapping Narcotics, Weapons Violence, and Kidnapping Incidents</div>
+<div id="map"></div>
+
+<script type="text/javascript">
+
+    var map = L.map('map', {
+        center: [41.8781, -87.6298], // Chicago coordinates
+        zoom: 10
+    });
+
+    // Define base layers
+    var osmLayer = L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+        maxZoom: 19,
+    });
+
+    // Define overlay layers
+    var geojson = L.geoJson(data, {
+        style: style,
+    });
+
+    var geojson2 = L.geoJson(data2, {
+        pointToLayer: function (feature, latlng) {
+            return L.circleMarker(latlng, {
+                radius: 5,
+                fillColor: getColorForPrimaryTy(feature.properties.Primary_Ty),
+                color: "#000",
+                weight: 1,
+                opacity: 4,
+                fillOpacity: 0.8
+            });
+        },
+        onEachFeature: function (feature, layer) {
+            var popupContent = '<b>Date:</b> ' + feature.properties.Date + '<br><b>Description:</b> ' + feature.properties.Descriptio;
+            layer.bindPopup(popupContent);
+        }
+    });
+
+    // Create heatmap layer
+    var heatmapLayer = L.heatLayer(getHeatmapData(data2), { radius: 15 });
+
+    // Add layers to the map
+    osmLayer.addTo(map);
+    geojson.addTo(map);
+    geojson2.addTo(map);
+    heatmapLayer.addTo(map);
+
+    // Create an object to hold the base layers and overlay layers
+    var baseMaps = {
+        "OSM": osmLayer
+    };
+
+    var overlayMaps = {
+        "Crimes": geojson,
+        "Incident Type": geojson2,
+        "Heatmap": heatmapLayer
+    };
+
+    // Add layer control to the map
+    L.control.layers(baseMaps, overlayMaps).addTo(map);
+
+    // Show legend for Crimes on page load
+    var legend = L.control({position: 'bottomright'});
+    legend.onAdd = function (map) {
+        var div = L.DomUtil.create('div', 'legend');
+        var grades = [0, 2, 5, 11, 21, 200];
+
+        div.innerHTML = '<b>Crime by Number<br> 2023 <br></b>';
+
+        for (var i = 0; i < grades.length; i++) {
+            div.innerHTML +=
+                '<i style="background:' + getColor(grades[i] + 1) + '"></i>' +
+                grades[i] + (grades[i + 1] ? '&ndash;' + grades[i + 1] + '<br>' : '+');
+        }
+
+        return div;
+    };
+    legend.addTo(map);
+
+    // Show legend for Incident Type on page load
+    var incidentLegend = L.control({position: 'bottomright'});
+    incidentLegend.onAdd = function (map) {
+        var div = L.DomUtil.create('div', 'legend');
+        var uniqueIncidentTypes = getUniqueIncidentTypes(data2);
+
+        div.innerHTML += '<hr><b>Crime by Type</b><br>';
+
+        // Create legend entries for each incident type
+        for (var k = 0; k < uniqueIncidentTypes.length; k++) {
+            div.innerHTML +=
+                '<i style="background:' + getColorForPrimaryTy(uniqueIncidentTypes[k]) + '"></i>' +
+                uniqueIncidentTypes[k] + '<br>';
+        }
+
+        return div;
+    };
+    incidentLegend.addTo(map);
+
+    // Show legend for Heatmap on page load
+var heatmapLegend = L.control({position: 'bottomright'});
+heatmapLegend.onAdd = function (map) {
+    var div = L.DomUtil.create('div', 'legend heatmap-legend');
+    div.innerHTML = '<b> Crime Heatmap</b><br>';
+
+
+    // Add vertical color gradient bar with labels
+    var gradient = document.createElement('div');
+    gradient.className = 'heatmap-gradient';
+    gradient.innerHTML = '<div class="heatmap-gradient-bar" style="background: linear-gradient(to bottom,#0000FF,Green ,yellow, #FF0000);">' +
+                         '<span class="heatmap-gradient-label heatmap-gradient-low">Low</span>' +
+                         '<span class="heatmap-gradient-label heatmap-gradient-high">High</span></div>';
+    div.appendChild(gradient);
+
+    return div;
+};
+heatmapLegend.addTo(map);
+
+    // Adding the legend when the layer is added
+    map.on('overlayadd', function(eventLayer){
+      if (eventLayer.name == 'Incident Type'){
+        incidentLegend.addTo(map);
+      }
+      if (eventLayer.name == 'Crimes'){
+        legend.addTo(map);
+      }
+      if (eventLayer.name == 'Heatmap'){
+        heatmapLegend.addTo(map);
+      }
+    });
+
+    // Removing the legend when the layer is removed
+    map.on('overlayremove', function(eventLayer){
+      if (eventLayer.name == 'Incident Type'){
+        map.removeControl(incidentLegend);
+      }
+      if (eventLayer.name == 'Crimes'){
+        map.removeControl(legend);
+      }
+      if (eventLayer.name == 'Heatmap'){
+        map.removeControl(heatmapLegend);
+      }
+    });
+
+    function getColor(value) {
+        return value > 21 ? '#800026' :
+            value > 11 ? '#BD0026' :
+            value > 5 ? '#E31A1C' :
+            value > 2 ? '#FC4E2A' :
+                '#FD8D3C';
+    }
+
+    function getColorForPrimaryTy(primaryType) {
+        switch (primaryType) {
+            case "NARCOTICS":
+                return '#FF0000'; // Red
+            case "KIDNAPPING":
+                return '#00FF00'; // Green
+            case "WEAPONS VIOLATION":
+                return '#0000FF'; // Blue
+            // Add more cases as needed for other types
+            default:
+                return '#808080'; // Gray for unknown types
+        }
+    }
+
+    function style(feature) {
+        return {
+            fillColor: getColor(feature.properties.count),
+            weight: 2,
+            opacity: 1,
+            color: 'gray',
+            fillOpacity: 0.9
+        };
+    }
+
+    function getUniqueIncidentTypes(data) {
+        var uniqueTypes = [];
+        data.features.forEach(function (feature) {
+            var type = feature.properties.Primary_Ty;
+            if (uniqueTypes.indexOf(type) === -1) {
+                uniqueTypes.push(type);
+            }
+        });
+        return uniqueTypes;
+    }
+
+    function getHeatmapData(data) {
+        return data.features.map(function (feature) {
+            return [
+                feature.geometry.coordinates[1], // Latitude
+                feature.geometry.coordinates[0], // Longitude
+            ];
+        });
+    }
+</script>
+</body>
+</html>
