@@ -115,7 +115,7 @@
     var geojson2 = L.geoJson(data2, {
         pointToLayer: function (feature, latlng) {
             return L.circleMarker(latlng, {
-                radius: 5,
+                radius: 3,
                 fillColor: getColorForPrimaryTy(feature.properties.Primary_Ty),
                 color: "#000",
                 weight: 1,
@@ -130,7 +130,7 @@
     });
 
     // Create heatmap layer
-    var heatmapLayer = L.heatLayer(getHeatmapData(data2), { radius: 15 });
+    var heatmapLayer = L.heatLayer(getHeatmapData(data2), { radius: 20 });
 
     // Add layers to the map
     osmLayer.addTo(map);
